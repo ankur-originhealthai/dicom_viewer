@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@cornerstonejs/core": "^3.19.5",
-    "@cornerstonejs/dicom-image-loader": "^3.25.0",
+    "@cornerstonejs/dicom-image-loader": "^3.26.0",
     "@cornerstonejs/tools": "^3.19.5",
     "cornerstone-math": "^0.1.10",
     "cornerstone-wado-image-loader": "^4.13.2",
