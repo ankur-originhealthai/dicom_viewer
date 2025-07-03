@@ -1,20 +1,17 @@
-"use client";
-import { useEffect, useRef, useState } from "react";
+'use client';
+import { useEffect, useRef, useState } from 'react';
 import {
   RenderingEngine,
-  Enums as e,
-  StackViewport,
+  Enums,
   imageLoader,
   metaData,
-  init as coreInit,
-} from "@cornerstonejs/core";
+  StackViewport,
+  init as cornerstoneCoreInit,
+} from '@cornerstonejs/core';
 import {
-  init as dicomImageLoaderInit,
-  wadouri,
-} from "@cornerstonejs/dicom-image-loader";
-import {
+  init as cornerstoneToolsInit,
   ToolGroupManager,
-  Enums,
+  Enums as csToolsEnums,
   addTool,
   PanTool,
   ZoomTool,
@@ -23,134 +20,149 @@ import {
   RectangleROITool,
   EllipticalROITool,
   AngleTool,
-  init as cornerstoneToolsInit,
-} from "@cornerstonejs/tools";
-import dicomParser from "dicom-parser";
-import hardcodedMetaDataProvider from "../lib/hardcodedMetaDataProvider";
-import { MouseBindings } from "@cornerstonejs/tools/enums/ToolBindings";
-const renderingEngineId = "engine1";
-const viewportId = "viewport1";
-const toolGroupId = "toolGroup1";
-export default function HomePageComponent() {
+} from '@cornerstonejs/tools';
+import hardcodedMetaDataProvider from '../lib/hardcodedMetaDataProvider';
+const renderingEngineId = 'myRenderingEngine';
+const viewportId = 'myViewport';
+const toolGroupId = 'myToolGroup';
+
+export default function DicomViewer() {
   const elementRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
-  const fetchFile = async () => {
-    const file = await fetch("/image.dcm");
-    return await file.blob();
+  const renderingEngineRef = useRef<RenderingEngine | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  const fetchDicomFile = async () => {
+    const response = await fetch('/image.dcm');
+    return await response.blob();
   };
+  
   useEffect(() => {
-    const initi = async () => {
-      if (!elementRef.current) return;
+    const initialize = async () => {
+      const {
+        init: dicomLoaderInit,
+        wadouri,
+      } = await import('@cornerstonejs/dicom-image-loader');
       
-      coreInit();
-      dicomImageLoaderInit();
-      cornerstoneToolsInit();
-      const element = elementRef.current!;
-      const imageBlob = await fetchFile();
-      const imageId = wadouri.fileManager.add(imageBlob);
+      await cornerstoneCoreInit();
+      await dicomLoaderInit();
+      await cornerstoneToolsInit();
+      // Register metaData provider
       metaData.addProvider(
         (type, imageId) => hardcodedMetaDataProvider(type, imageId, imageId),
         10000
       );
       
+      
+      const imageBlob = await fetchDicomFile();
+      const imageId = wadouri.fileManager.add(imageBlob);
+      if (!elementRef.current) return;
+      const element = elementRef.current;
+      
       const renderingEngine = new RenderingEngine(renderingEngineId);
+      renderingEngineRef.current = renderingEngine;
       renderingEngine.setViewports([
         {
           viewportId,
-          type: e.ViewportType.STACK,
+          type: Enums.ViewportType.STACK,
           element,
         },
       ]);
       const viewport = renderingEngine.getViewport(viewportId) as StackViewport;
-      console.log(viewport)
-
-      await viewport.setStack([imageId], 0);
-      
-      // Register tools
-      addTool(PanTool);
-      addTool(ZoomTool);
-      addTool(WindowLevelTool);
-      addTool(LengthTool);
-      addTool(RectangleROITool);
-      addTool(EllipticalROITool);
-      addTool(AngleTool);
+      await viewport.setStack([imageId]);
+      viewport.render();
+      // Add Tools
+      [PanTool, ZoomTool, WindowLevelTool, LengthTool, RectangleROITool, EllipticalROITool, AngleTool].forEach(addTool);
+      // ToolGroup
       const toolGroup = ToolGroupManager.createToolGroup(toolGroupId);
-      if(!toolGroup) return
+      if (!toolGroup) return;
+      [
+        PanTool,
+        ZoomTool,
+        WindowLevelTool,
+        LengthTool,
+        RectangleROITool,
+        EllipticalROITool,
+        AngleTool,
+      ].forEach((Tool) => {
+        toolGroup.addTool(Tool.toolName);
+      });
       
-      toolGroup.addTool(PanTool.toolName);
-      toolGroup.addTool(ZoomTool.toolName);
-      toolGroup.addTool(WindowLevelTool.toolName);
-      toolGroup.addTool(LengthTool.toolName);
-      toolGroup.addTool(RectangleROITool.toolName);
-      toolGroup.addTool(EllipticalROITool.toolName);
-      toolGroup.addTool(AngleTool.toolName);
       toolGroup.addViewport(viewportId, renderingEngineId);
-      await viewport.render();
-      viewport.resize()
       setLoaded(true);
     };
-    initi();
+    initialize();
+   
   }, []);
-  const handleToolChange = (toolName: string) => {
-    const toolGroup = ToolGroupManager.getToolGroup(toolGroupId);
-    if (!toolGroup) return;
-    toolGroup.setToolActive(toolName, {
-      bindings: [{ mouseButton: MouseBindings.Primary, }],
-    });
-  };
+const handleToolChange = (selectedToolName: string) => {
+  const toolGroup = ToolGroupManager.getToolGroup(toolGroupId);
+  if (!toolGroup) {
+    console.error('Tool group not found');
+    return;
+  }
+  const allTools = [
+    PanTool.toolName,
+    ZoomTool.toolName,
+    WindowLevelTool.toolName,
+    LengthTool.toolName,
+    RectangleROITool.toolName,
+    EllipticalROITool.toolName,
+    AngleTool.toolName,
+  ];
+  
+  allTools.forEach((toolName) => {
+    if (toolName === selectedToolName) {
+      toolGroup.setToolActive(toolName, {
+        bindings: [{ mouseButton: csToolsEnums.MouseBindings.Primary }],
+      });
+    } else {
+      toolGroup.setToolPassive(toolName);
+    }
+  });
+  const renderingEngine = renderingEngineRef.current;
+  const viewport = renderingEngine?.getViewport(viewportId);
+  viewport?.render();
+};
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
-      <h1 className="text-2xl font-bold mb-6">DICOM Viewer</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-6">
+      <h2 className="text-xl font-bold mb-4">Cornerstone DICOM Viewer</h2>
       {loaded && (
-        <div className="flex gap-4 mb-4 flex-wrap justify-center">
-          <button
-            onClick={() => handleToolChange(RectangleROITool.toolName)}
-            className="bg-gray-700 px-4 py-2 rounded"
-          >
-            Rectangle
-          </button>
-          <button
-            onClick={() => handleToolChange(PanTool.toolName)}
-            className="bg-gray-700 px-4 py-2 rounded"
-          >
-            Pan
-          </button>
-          <button
-            onClick={() => handleToolChange(ZoomTool.toolName)}
-            className="bg-gray-700 px-4 py-2 rounded"
-          >
-            Zoom
-          </button>
-          <button
-            onClick={() => handleToolChange(WindowLevelTool.toolName)}
-            className="bg-gray-700 px-4 py-2 rounded"
-          >
-            Brightness
-          </button>
-          <button
-            onClick={() => handleToolChange(LengthTool.toolName)}
-            className="bg-gray-700 px-4 py-2 rounded"
-          >
-            Length
-          </button>
-          <button
-            onClick={() => handleToolChange(EllipticalROITool.toolName)}
-            className="bg-gray-700 px-4 py-2 rounded"
-          >
-            Ellipse
-          </button>
-          <button
-            onClick={() => handleToolChange(AngleTool.toolName)}
-            className="bg-gray-700 px-4 py-2 rounded"
-          >
-            Angle
-          </button>
+        <div className="flex flex-wrap justify-center gap-3 mb-4">
+          {[RectangleROITool, PanTool, ZoomTool, WindowLevelTool, LengthTool, EllipticalROITool, AngleTool].map(
+            (Tool) => (
+              <button
+                key={Tool.toolName}
+                onClick={() => handleToolChange(Tool.toolName)}
+                className="bg-gray-700 px-4 py-2 rounded hover:bg-gray-600"
+              >
+                {Tool.toolName}
+              </button>
+            )
+          )}
         </div>
       )}
       <div
         ref={elementRef}
-        className="w-[512px] h-[512px] border border-gray-500 bg-black"
+        className="border border-gray-500"
+        style={{ width: '512px', height: '512px', touchAction: 'none' }}
       />
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
