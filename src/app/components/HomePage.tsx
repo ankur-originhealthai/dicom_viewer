@@ -21,10 +21,12 @@ import {
   EllipticalROITool,
   AngleTool,
   annotation,
+  LabelTool,
 } from "@cornerstonejs/tools";
 import hardcodedMetaDataProvider from "../lib/hardcodedMetaDataProvider";
 import { Annotation } from "@cornerstonejs/tools/types";
 import { state as AnnotationState } from "@cornerstonejs/tools";
+import CustomLabelHandler from "../customs/customLabelTool";
 const renderingEngineId = "myRenderingEngine";
 const viewportId = "myViewport";
 const toolGroupId = "myToolGroup";
@@ -75,6 +77,7 @@ export default function DicomViewer() {
 
       [
         PanTool,
+        LabelTool,
         ZoomTool,
         WindowLevelTool,
         LengthTool,
@@ -88,6 +91,7 @@ export default function DicomViewer() {
       [
         PanTool,
         ZoomTool,
+        LabelTool,
         WindowLevelTool,
         LengthTool,
         RectangleROITool,
@@ -116,6 +120,7 @@ export default function DicomViewer() {
       LengthTool.toolName,
       RectangleROITool.toolName,
       EllipticalROITool.toolName,
+      LabelTool.toolName,
       AngleTool.toolName,
     ];
 
@@ -143,6 +148,7 @@ export default function DicomViewer() {
             ZoomTool,
             WindowLevelTool,
             LengthTool,
+            LabelTool,
             EllipticalROITool,
             AngleTool,
           ].map((Tool) => (
@@ -155,7 +161,12 @@ export default function DicomViewer() {
             </button>
           ))}
         </div>
+
+        
       )}
+
+     
+
       <div
         ref={elementRef}
         className="border border-gray-500"
